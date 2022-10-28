@@ -2,23 +2,38 @@
 //!
 //! # Examples
 //!
+//! # server
 //! cargo run -- -l 12345
-//! cargo run -- 127.0.0.1 12345
+//!
+//! # client
+//! cargo run -- localhost 12345
 
 mod network;
 
-use crate::network::ffi::connection::{nw_connection_cancel, nw_connection_copy_endpoint, nw_connection_create, nw_connection_receive_message, nw_connection_send, nw_connection_set_queue, nw_connection_set_state_changed_handler, nw_connection_start, nw_connection_state_t, nw_connection_t, nw_content_context_t};
+use crate::network::ffi::connection::{
+    nw_connection_cancel, nw_connection_copy_endpoint, nw_connection_create,
+    nw_connection_receive_message, nw_connection_send, nw_connection_set_queue,
+    nw_connection_set_state_changed_handler, nw_connection_start, nw_connection_state_t,
+    nw_connection_t, nw_content_context_t,
+};
 use crate::network::ffi::core::{nw_error_get_error_code, nw_error_t, nw_release, nw_retain};
 use crate::network::ffi::dispatch::{
     dispatch_data_create, dispatch_data_create_map, dispatch_data_t,
 };
-use crate::network::ffi::endpoint::{nw_endpoint_create_host, nw_endpoint_get_hostname, nw_endpoint_get_port, nw_endpoint_t};
+use crate::network::ffi::endpoint::{
+    nw_endpoint_create_host, nw_endpoint_get_hostname, nw_endpoint_get_port, nw_endpoint_t,
+};
 use crate::network::ffi::ip_options::{nw_ip_options_set_version, nw_ip_version_t};
 use crate::network::ffi::listener::{
     nw_listener_create, nw_listener_set_new_connection_handler, nw_listener_set_queue,
     nw_listener_set_state_changed_handler, nw_listener_start, nw_listener_state_t, nw_listener_t,
 };
-use crate::network::ffi::parameters::{_nw_parameters_configure_protocol_default_configuration, _nw_parameters_configure_protocol_disable, nw_parameters_copy_default_protocol_stack, nw_parameters_create_secure_udp, nw_parameters_set_local_endpoint, nw_parameters_t, nw_protocol_stack_copy_internet_protocol};
+use crate::network::ffi::parameters::{
+    _nw_parameters_configure_protocol_default_configuration,
+    _nw_parameters_configure_protocol_disable, nw_parameters_copy_default_protocol_stack,
+    nw_parameters_create_secure_udp, nw_parameters_set_local_endpoint, nw_parameters_t,
+    nw_protocol_stack_copy_internet_protocol,
+};
 use block::{Block, ConcreteBlock};
 use dispatch::ffi::{dispatch_get_main_queue, dispatch_main};
 use dispatch::{Queue, QueueAttribute};
@@ -59,7 +74,7 @@ fn main() {
     }
 
     if args.server {
-        let listener = unsafe { create_and_start_listener(&args) };
+        let listener = create_and_start_listener(&args);
         if listener.is_null() {
             eprintln!("Creating listener failed");
             std::process::exit(1);
@@ -74,9 +89,7 @@ fn main() {
 /// Returns a retained listener on a local port and optional address.
 /// Schedules listener on main queue and starts it.
 ///  -> nw_listener_t
-fn create_and_start_listener(
-    args: &AppArgs
-) -> nw_listener_t {
+fn create_and_start_listener(args: &AppArgs) -> nw_listener_t {
     let parameters = unsafe {
         nw_parameters_create_secure_udp(
             _nw_parameters_configure_protocol_disable,
@@ -159,7 +172,7 @@ fn create_and_start_listener(
             } else {
                 // Accept the incoming connection and start sending
                 // and receiving on it.
-                println!("Accepting incoming connection!");
+                // println!("Accepting incoming connection!");
                 G_CONNECTION = Some(connection);
                 nw_retain(connection as *mut c_void);
 
@@ -198,17 +211,16 @@ fn create_outbound_connection(args: &AppArgs) {
         }
     }
 
-    let address_cstr =
-        CString::new(args.hostname.clone().unwrap_or("::".to_string())).unwrap();
+    let address_cstr = CString::new(args.hostname.clone().unwrap_or("::".to_string())).unwrap();
     let port_cstr = CString::new(args.port.clone().unwrap_or("0".to_string())).unwrap();
-    let endpoint = unsafe {
-        nw_endpoint_create_host(address_cstr.as_ptr(), port_cstr.as_ptr())
-    };
+    let endpoint = unsafe { nw_endpoint_create_host(address_cstr.as_ptr(), port_cstr.as_ptr()) };
 
     let connection = unsafe { nw_connection_create(endpoint, parameters) };
     unsafe { nw_release(endpoint as *mut c_void) };
     unsafe { nw_release(parameters as *mut c_void) };
-    unsafe { G_CONNECTION = Some(connection); }
+    unsafe {
+        G_CONNECTION = Some(connection);
+    }
 
     start_connection(connection);
     start_send_receive_loop(connection);
@@ -288,7 +300,7 @@ fn send_loop(connection: nw_connection_t) {
                 let error_no = unsafe { nw_error_get_error_code(error) };
                 eprintln!("connection send error: {error_no}");
             }
-            println!("connection send completed");
+            // println!("connection send completed");
         });
         let block = connection_send_completion_handler.copy();
         unsafe {
@@ -313,7 +325,7 @@ fn receive_loop(connection: nw_connection_t) {
                 let error_no = unsafe { nw_error_get_error_code(error) };
                 eprintln!("connection message receiving error: {error_no}");
             }
-            println!("connection message receiving completed");
+            // println!("connection message receiving completed");
 
             let mut buffer = 0 as *mut c_void;
             let mut buffer_len: usize = 0;
@@ -323,7 +335,8 @@ fn receive_loop(connection: nw_connection_t) {
             } else {
                 let s =
                     unsafe { String::from_raw_parts(buffer as *mut u8, buffer_len, buffer_len) };
-                println!("connection received message: {s}");
+                println!("[REV]: {s}");
+                receive_loop(unsafe { G_CONNECTION.unwrap() });
             }
         },
     );

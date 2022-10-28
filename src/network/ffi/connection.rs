@@ -1,16 +1,19 @@
 use super::core::{nw_error_t, nw_object_t};
 use super::dispatch::dispatch_data_t;
 use super::endpoint::nw_endpoint_t;
+use super::parameters::nw_parameters_t;
 use block::Block;
 use dispatch::ffi::dispatch_queue_t;
 use std::ffi::c_void;
-use super::parameters::nw_parameters_t;
 
 #[link(name = "Network", kind = "framework")]
 extern "C" {
     static _nw_content_context_default_message: *mut c_void;
 
-    pub(crate) fn nw_connection_create(endpoint: nw_endpoint_t, parameters: nw_parameters_t) -> nw_connection_t ;
+    pub(crate) fn nw_connection_create(
+        endpoint: nw_endpoint_t,
+        parameters: nw_parameters_t,
+    ) -> nw_connection_t;
     pub(crate) fn nw_connection_cancel(connection: nw_connection_t);
 
     pub(crate) fn nw_connection_set_queue(connection: nw_connection_t, queue: dispatch_queue_t);
